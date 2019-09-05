@@ -1,0 +1,29 @@
+cors = true
+
+servicesFile = ''
+signatureSecret = 'foobar'
+
+[proxy]
+claimHeader = 'X-Claim'
+preserveCookies = false
+
+[cookie]
+name = 'claim'
+maxAge = '1w'
+secure = true
+httpOnly = true
+sameSite = true
+
+[log]
+file = './nodecaf.log'
+
+[session]
+timeout = '1w'
+
+[redis]
+host = "localhost"
+port = 6379
+
+[auth]
+method = 'POST'
+url = "http://localhost"
