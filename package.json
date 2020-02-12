@@ -1,6 +1,6 @@
 {
   "name": "api-joe",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An API Gateway to easily expose your services to web clients",
   "main": "lib/main.js",
   "author": "Guilherme C. Souza",
@@ -10,24 +10,28 @@
     "api-joe": "bin/api-joe.js"
   },
   "bugs": {
-      "url": "https://gitlab.com/GCSBOSS/api-joe/issues"
+    "url": "https://gitlab.com/GCSBOSS/api-joe/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.com/GCSBOSS/api-joe.git"
   },
   "scripts": {
     "test": "mocha -b --no-diff test/*.js",
     "coverage": "nyc -r html -r text-summary mocha -b --no-diff --no-warnings test/*.js"
   },
   "keywords": [
-      "api",
-      "gateway",
-      "proxy",
-      "filter",
-      "session",
-      "log",
-      "expose",
-      "rest", 
-      "service",
-      "cookie",
-      "signed"
+    "api",
+    "gateway",
+    "proxy",
+    "filter",
+    "session",
+    "log",
+    "expose",
+    "rest",
+    "service",
+    "cookie",
+    "signed"
   ],
   "dependencies": {
     "async-redis": "^1.1.7",
