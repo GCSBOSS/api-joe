@@ -1,5 +1,5 @@
 cors = true
-
+port = 9000
 servicesFile = ''
 signatureSecret = 'foobar'
 

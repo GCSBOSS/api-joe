@@ -12,13 +12,13 @@ An API Gateway to easily expose your services to web clients
 
 The official image repository in Docker Hub is `gcsboss/api-joe`.
 
-Run like this: `docker run -p 10080:80 gcsboss/api-joe`
+Run like this: `docker run -p 9000:9000 gcsboss/api-joe`
 
 ## Configuration
 
 ```toml
 
-port = 80
+port = 9000
 
 [auth]
 method = 'POST'
