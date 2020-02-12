@@ -24,3 +24,4 @@ port = 6379
 [auth]
 method = 'POST'
 url = "http://localhost"
+timeout = 3000

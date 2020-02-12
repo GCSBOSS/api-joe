@@ -24,6 +24,7 @@ port = 80
 [auth]
 method = 'POST'
 url = 'http://auth-api/path'
+timeout = 3000
 
 [redis]
 host = 'session'
