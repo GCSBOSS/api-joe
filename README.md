@@ -24,6 +24,7 @@ port = 9000
 method = 'POST'
 url = 'http://auth-api/path'
 timeout = 3000
+onSuccess = 'http://webhook.com/auth-success'
 
 [redis]
 host = 'session'

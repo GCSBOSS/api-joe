@@ -25,3 +25,4 @@ port = 6379
 method = 'POST'
 url = "http://localhost"
 timeout = 3000
+onSuccess = false

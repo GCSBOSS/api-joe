@@ -143,7 +143,7 @@ describe('API', function(){
 
 describe('Settings', function(){
 
-    it('Should create signed cookie when succeeds [cookie.name]', async function(){
+    it('Should create signed cookie when auth succeeds [cookie.name]', async function(){
         await app.restart({ cookie: { name: 'foobar' } });
         let { cookies } = await base.post('login');
         assert.strictEqual(cookies.foobar.charAt(0), 's');
@@ -162,6 +162,20 @@ describe('Settings', function(){
         await new Promise(done => setTimeout(done, 1500));
         let { body } = await base.get('httpbin/anything', { cookies });
         assert(body.indexOf('X-Claim') < 0);
+    });
+
+    it('Should POST to specified URL when auth succeeds [auth.onSuccess]', function(done){
+        let serv = require('http').createServer((req, res) => {
+            assert.strictEqual(req.headers['x-joe-auth'], 'success');
+            serv.close();
+            res.end();
+            done();
+        });
+        serv.listen(2345);
+        (async () => {
+            await app.restart({ auth: { onSuccess: 'http://localhost:2345' } });
+            await base.post('login');
+        })();
     });
 
 });
