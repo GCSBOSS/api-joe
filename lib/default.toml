@@ -14,9 +14,6 @@ secure = true
 httpOnly = true
 sameSite = true
 
-[log]
-file = './nodecaf.log'
-
 [session]
 timeout = '1w'
 

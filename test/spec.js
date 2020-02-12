@@ -1,6 +1,8 @@
 const assert = require('assert');
 const { context } = require('muhb');
 
+process.env.NODE_ENV = 'testing';
+
 const init = require('../lib/main');
 
 const HTTPBIN_URL = process.env.HTTPBIN_URL || 'http://localhost:8066';

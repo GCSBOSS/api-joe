@@ -21,10 +21,6 @@ Run like this: `docker run -p 10080:80 -v /your/conf.toml:/usr/src/app/conf.toml
 
 port = 80
 
-[log]
-level = 'debug'
-file = './api-joe.log'
-
 [auth]
 method = 'POST'
 url = 'http://auth-api/path'
