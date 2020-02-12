@@ -32,8 +32,8 @@
   "dependencies": {
     "async-redis": "^1.1.7",
     "http-proxy": "^1.18.0",
-    "muhb": "^2.0.3",
-    "nodecaf": "^0.7.10",
+    "muhb": "^3.0.0",
+    "nodecaf": "^0.8.0",
     "periodo": "^0.1.1"
   }
 }

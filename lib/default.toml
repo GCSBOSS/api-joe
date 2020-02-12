@@ -1,5 +1,5 @@
 cors = true
-
+port = 9000
 servicesFile = ''
 signatureSecret = 'foobar'
 
@@ -14,9 +14,6 @@ secure = true
 httpOnly = true
 sameSite = true
 
-[log]
-file = './nodecaf.log'
-
 [session]
 timeout = '1w'
 
@@ -27,3 +24,5 @@ port = 6379
 [auth]
 method = 'POST'
 url = "http://localhost"
+timeout = 3000
+onSuccess = false

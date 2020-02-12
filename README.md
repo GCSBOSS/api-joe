@@ -5,29 +5,26 @@ An API Gateway to easily expose your services to web clients
 ## Get Started
 
 1. Install with: `npm i -g api-joe`.
-2. Point `APIJOE_CONF` env var to a TOML [config file](#configuration).
-3. Setup your [services](#services).
-4. Run in the terminal with: `api-joe`.
+2. Setup your [services](#services).
+3. Run in the terminal with: `api-joe` (optional argument for the [config file](#configuration) path).
 
 ## Get Started with Docker
 
 The official image repository in Docker Hub is `gcsboss/api-joe`.
 
-Run like this: `docker run -p 10080:80 -v /your/conf.toml:/usr/src/app/conf.toml gcsboss/api-joe`
+Run like this: `docker run -p 9000:9000 gcsboss/api-joe`
 
 ## Configuration
 
 ```toml
 
-port = 80
-
-[log]
-level = 'debug'
-file = './api-joe.log'
+port = 9000
 
 [auth]
 method = 'POST'
 url = 'http://auth-api/path'
+timeout = 3000
+onSuccess = 'http://webhook.com/auth-success'
 
 [redis]
 host = 'session'
