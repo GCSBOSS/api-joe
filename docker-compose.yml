@@ -1,0 +1,21 @@
+version: '3.7'
+
+services:
+
+  #joe:
+  #  build: .
+  #  volumes:
+  #    - ./test.toml:/usr/src/app/conf.toml
+
+  session:
+    image: redis
+    ports:
+      - 6379:6379
+
+  httpbin:
+    image: kennethreitz/httpbin
+    ports:
+      - 8066:80
+
+  auth:
+    image: gcsboss/okaeri
