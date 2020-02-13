@@ -4,11 +4,11 @@ ENV NODE_ENV production
 
 EXPOSE 9000
 
-WORKDIR /usr/src/app
+WORKDIR /joe
 
 RUN addgroup -g 2000 -S joe && \
     adduser -u 2000 -S joe -G joe && \
-    chown joe:joe /usr/src/app
+    chown joe:joe /joe
 
 USER joe
 
