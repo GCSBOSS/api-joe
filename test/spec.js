@@ -8,6 +8,7 @@ const init = require('../lib/main');
 const HTTPBIN_URL = process.env.HTTPBIN_URL || 'http://localhost:8066';
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const SERVICES = {
+    ws: { url: 'ws://localhost:1234', endpoints: [ 'GET /ws' ] },
     unresponsive: { url: 'http://anything', endpoints: [ 'GET /foo' ] },
     httpbin: { url: HTTPBIN_URL, endpoints: [ 'GET /get', 'GET /anything' ] }
 };
@@ -102,6 +103,41 @@ describe('API', function(){
             await app.restart({ proxy: { preserveCookies: true } });
             let { assert } = await base.get('httpbin/get', { 'cookies': { foo: 'bar' } });
             assert.body.contains('"Cookie": "foo=bar');
+        });
+
+        it('Should support WebSocket connection', function(done){
+            let count = 0;
+
+            const WebSocket = require('ws');
+            let wss = new WebSocket.Server({ port: 1234 });
+            wss.on('connection', client => {
+
+                client.on('message', message => {
+                    count++;
+                    assert.strictEqual(message, 'foobar');
+                    client.send('bahbaz');
+                });
+
+                client.on('close', () => {
+                    assert.strictEqual(count, 4);
+                    wss.close();
+                    done();
+                });
+
+                count++;
+            });
+
+            let wsc = new WebSocket('http://localhost:8232/ws/ws');
+            wsc.on('open', () => {
+                count++;
+                wsc.send('foobar');
+            });
+            wsc.on('message', m => {
+                count++;
+                assert.strictEqual(m, 'bahbaz');
+                wsc.close();
+            });
+
         });
 
     });

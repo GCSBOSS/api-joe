@@ -39,5 +39,8 @@
     "muhb": "^3.0.0",
     "nodecaf": "^0.8.1",
     "periodo": "^0.1.1"
+  },
+  "devDependencies": {
+    "ws": "^7.2.1"
   }
 }
