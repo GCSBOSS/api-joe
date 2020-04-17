@@ -37,7 +37,8 @@
     "async-redis": "^1.1.7",
     "http-proxy": "^1.18.0",
     "muhb": "^3.0.1",
-    "nodecaf": "^0.8.5",
+    "nodecaf": "^0.9.1",
+    "nodecaf-run": "0.0.2",
     "periodo": "^0.1.1",
     "uuid": "^7.0.2"
   },

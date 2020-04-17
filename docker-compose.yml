@@ -7,6 +7,11 @@ services:
   #  volumes:
   #    - ./test.toml:/usr/src/app/conf.toml
 
+  db:
+    image: mongo
+    ports:
+      - 27017:27017
+
   session:
     image: redis
     ports:

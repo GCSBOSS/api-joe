@@ -1,19 +1,13 @@
 
-FROM 'node:13-alpine'
-ENV NODE_ENV production
-
-EXPOSE 9000
-
-WORKDIR /joe
-
-RUN addgroup -g 2000 -S joe && \
-    adduser -u 2000 -S joe -G joe && \
-    chown joe:joe /joe
-
-USER joe
+FROM node:13-alpine
 
 COPY package*.json ./
 RUN npm i -P
 COPY . .
 
-ENTRYPOINT ["node", "./bin/api-joe.js"]
+RUN mkdir /dist
+RUN cp -r ./lib /dist/
+RUN cp -r ./node_modules /dist/
+
+FROM gcsboss/nodecaf
+COPY --from=0 /dist /app
