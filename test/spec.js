@@ -1,35 +1,60 @@
 const assert = require('assert');
+const { v4: uuid } = require('uuid');
 const { context } = require('muhb');
+const { AppServer } = require('nodecaf');
 
 process.env.NODE_ENV = 'testing';
 
 const init = require('../lib/main');
 
-const HTTPBIN_URL = process.env.HTTPBIN_URL || 'http://localhost:8066';
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const SERVICES = {
     ws: { url: 'ws://localhost:1234', endpoints: [ 'GET /ws' ] },
     unresponsive: { url: 'http://anything', endpoints: [ 'GET /foo' ] },
-    httpbin: { url: HTTPBIN_URL, endpoints: [ 'GET /get', 'GET /anything' ] }
+    backend: { url: 'http://localhost:8060', endpoints: [ 'GET /get', 'GET /headers' ] }
 };
 
 let base = context('http://localhost:8232');
 
 let app;
 
+const authProvider = new AppServer({ port: 8060, log: false });
+authProvider.api(
+    ({ post, get }) => {
+        post('/auth', ({ res, body }) => {
+            if(body)
+                return res.status(400).end();
+            res.end('ID: ' + uuid());
+        });
+
+        get('/headers', ({ headers, res }) => {
+            res.json(headers);
+        });
+    }
+);
+
+before(async function(){
+    await authProvider.start();
+});
+
+after(async function(){
+    await authProvider.stop();
+});
+
 beforeEach(async function(){
     app = init();
     app.setup({
         port: 8232,
         redis: { host: REDIS_HOST },
-        cookie: { name: 'foobaz' },
+        cookie: { name: 'foobaz', secret: 'FOOBAR' },
         services: SERVICES,
-        auth: { url: HTTPBIN_URL + '/post' }
+        auth: { url: 'http://localhost:8060/auth' }
     });
     await app.start();
 });
 
 afterEach(async function(){
+    await new Promise(done => setTimeout(done, 400));
     await app.stop();
 });
 
@@ -94,15 +119,15 @@ describe('API', function(){
         });
 
         it('Should reach an exposed service endpoints', async function(){
-            let { assert } = await base.get('httpbin/get');
+            let { assert } = await base.get('backend/headers');
             assert.status.is(200);
-            assert.body.contains('/get');
+            assert.body.contains('date');
         });
 
         it('Should preserve cookies from outside when setup [proxy.preserveCookies]', async function(){
             await app.restart({ proxy: { preserveCookies: true } });
-            let { assert } = await base.get('httpbin/get', { 'cookies': { foo: 'bar' } });
-            assert.body.contains('"Cookie": "foo=bar');
+            let { assert } = await base.get('backend/headers', { 'cookies': { foo: 'bar' } });
+            assert.body.contains('"cookie":"foo=bar');
         });
 
         it('Should support WebSocket connection', function(done){
@@ -152,13 +177,12 @@ describe('API', function(){
         });
 
         it('Should return authentication failure when not 200', async function(){
-            await app.restart({ auth: { url: HTTPBIN_URL + '/get' } });
-            let { assert } = await base.post('login');
+            let { assert } = await base.post('login', 'must fail');
             assert.status.is(400);
         });
 
         it('Should return ok when auth succeeds', async function(){
-            let { assert } = await base.post('login', 'some raw data');
+            let { assert } = await base.post('login');
             assert.status.is(200);
         });
 
@@ -168,7 +192,7 @@ describe('API', function(){
 
         it('Should force expire an active session', async function(){
             await app.restart({ session: { timeout: '1d' }, cookie: { secure: false } });
-            let { cookies } = await base.post('login', 'some raw data');
+            let { cookies } = await base.post('login');
             let { headers } = await base.post('logout', { cookies });
             assert(headers['set-cookie'][0].indexOf('01 Jan 1970') > 0);
         });
@@ -188,16 +212,16 @@ describe('Settings', function(){
     it('Should add setup header when proxying after auth [cookie.*][proxy.claimHeader]', async function(){
         await app.restart({ proxy: { claimHeader: 'X-Foo' }, cookie: { secure: false } });
         let { cookies } = await base.post('login');
-        let { assert } = await base.get('httpbin/anything', { cookies });
-        assert.body.contains('"X-Foo":');
+        let { assert } = await base.get('backend/headers', { cookies });
+        assert.body.contains('"x-foo":');
     });
 
     it('Should expire auth data after the setup timeout [session.timeout]', async function(){
         await app.restart({ session: { timeout: '1s' }, cookie: { secure: false } });
-        let { cookies } = await base.post('login', 'some raw data');
+        let { cookies } = await base.post('login');
         await new Promise(done => setTimeout(done, 1500));
-        let { body } = await base.get('httpbin/anything', { cookies });
-        assert(body.indexOf('X-Claim') < 0);
+        let { body } = await base.get('backend/headers', { cookies });
+        assert(body.indexOf('x-claim') < 0);
     });
 
     it('Should POST to specified URL when auth succeeds [auth.onSuccess]', function(done){

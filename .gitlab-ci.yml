@@ -29,10 +29,8 @@ lint-js:
 # Performs unit testing.
 unit-test:
   variables:
-    HTTPBIN_URL: http://kennethreitz-httpbin
     REDIS_HOST: redis
   services:
-    - kennethreitz/httpbin
     - redis
   coverage: '/Statements\s*:\s*(\d+(?:\.\d+)?\%)/'
   image: registry.gitlab.com/gcsboss/docker-mocha-nyc:0.1.0-alpine
