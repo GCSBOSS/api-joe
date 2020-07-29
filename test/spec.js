@@ -165,6 +165,149 @@ describe('API', function(){
 
     });
 
+    describe('WS /events', function(){
+        const WebSocket = require('ws');
+        const redis = require('async-redis');
+
+        let backend, logWS, pubWS, logWS2, logClaim;
+
+        before(async function(){
+            backend = redis.createClient({ host: REDIS_HOST });
+            await new Promise( (done, fail) => {
+                backend.on('connect', done);
+                backend.on('error', fail);
+                backend.on('end', fail);
+            });
+        });
+
+        beforeEach(async function(){
+            let { cookies } = await base.post('login');
+            let { cookies: c2 } = await base.post('login');
+            logClaim = await backend.get(cookies.foobaz.substr(2, 36));
+            await backend.sadd(logClaim, logClaim);
+            pubWS = new WebSocket('ws://localhost:8232/events');
+            logWS = new WebSocket('ws://localhost:8232/events', {
+                headers: { 'Cookie': 'foobaz=' + cookies.foobaz }
+            });
+            logWS2 = new WebSocket('ws://localhost:8232/events', {
+                headers: { 'Cookie': 'foobaz=' + c2.foobaz }
+            });
+        });
+
+        afterEach(function(){
+            pubWS.close();
+            logWS.close();
+            logWS2.close();
+        });
+
+        after(function(){
+            backend.quit();
+        });
+
+        it('Should accept Authenticated WS clients', async function(){
+            await new Promise(done => logWS.on('open', async () => {
+                await new Promise(done => setTimeout(done, 400));
+                app.websockets.forEach(ws => assert(ws.claim || ws.public));
+                done();
+            }));
+        });
+
+        it('Should notify all clients', function(done){
+            let c = 0, r = 0;
+            let cfn = () => {
+                c == 1 &&
+                    backend.publish('joe:ws:event', '{"broadcast":true,"data":"foobar"}');
+                c++;
+            };
+            let rfn = msg => {
+                assert.strictEqual(msg, '"foobar"');
+                r == 1 && done();
+                r++;
+            }
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            pubWS.on('message', rfn);
+            logWS.on('message', rfn);
+        });
+
+        it('Should notify only public clients', function(done){
+            let c = 0;
+            let cfn = () => {
+                c == 1 &&
+                    backend.publish('joe:ws:event', '{"public":true,"data":"foobar"}');
+                c++;
+            };
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            pubWS.on('message', () => done());
+            logWS.on('message', () => done(new Error('Logged client received public message')));
+        });
+
+        it('Should notify only targeted clients', function(done){
+            let c = 0;
+            let cfn = () => {
+                c == 2 &&
+                    backend.publish('joe:ws:event', '{"target":"' + logClaim + '","data":"foobar"}');
+                c++;
+            };
+
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            logWS2.on('open', cfn);
+            logWS.on('message', () => setTimeout(done, 400));
+            pubWS.on('message', () => done(new Error('Logged client received public message')));
+            logWS2.on('message', () => done(new Error('Logged client received public message')));
+        });
+
+        it('Should notify only targeted group', function(done){
+            let c = 0;
+            let cfn = () => {
+                c == 2 &&
+                    backend.publish('joe:ws:event', '{"members":"' + logClaim + '","data":"foobar"}');
+                c++;
+            };
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            logWS2.on('open', cfn);
+            logWS.on('message', () => done());
+            pubWS.on('message', () => done(new Error('Logged client received public message')));
+            logWS2.on('message', () => done(new Error('Logged client received public message')));
+        });
+
+        it('Should notify only targeted group with exception', function(done){
+            let c = 0;
+            let cfn = () => {
+                c == 2 &&
+                    backend.publish('joe:ws:event', `{"except":["${logClaim}"], "members":"${logClaim}","data":"foobar"}`);
+                c++;
+            };
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            logWS2.on('open', cfn);
+            logWS.on('message', () => done(new Error('Logged client received public message')));
+            pubWS.on('message', () => done(new Error('Logged client received public message')));
+            logWS2.on('message', () => done(new Error('Logged client received public message')));
+            setTimeout(done, 400);
+        });
+
+        it('Should notify only targeted clients except within group', function(done){
+            let c = 0;
+            let cfn = () => {
+                c == 2 &&
+                    backend.publish('joe:ws:event', `{"target":["${logClaim}"], "notMembers":"${logClaim}","data":"foobar"}`);
+                c++;
+            };
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            logWS2.on('open', cfn);
+            logWS.on('message', () => done(new Error('Logged client received public message')));
+            pubWS.on('message', () => done(new Error('Logged client received public message')));
+            logWS2.on('message', () => done(new Error('Logged client received public message')));
+            setTimeout(done, 400);
+        });
+
+    });
+
 });
 
 describe('Settings', function(){
