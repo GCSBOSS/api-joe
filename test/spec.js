@@ -1,7 +1,7 @@
 const assert = require('assert');
 const { v4: uuid } = require('uuid');
 const { context } = require('muhb');
-const { AppServer } = require('nodecaf');
+const Nodecaf = require('nodecaf');
 
 process.env.NODE_ENV = 'testing';
 
@@ -18,9 +18,9 @@ let base = context('http://localhost:8232');
 
 let app;
 
-const authProvider = new AppServer({ port: 8060, log: false });
-authProvider.api(
-    ({ post, get }) => {
+const authProvider = new Nodecaf({
+    conf: { port: 8060, log: false },
+    api({ post, get }){
         post('/auth', ({ res, body }) => {
             if(body)
                 return res.status(400).end();
@@ -31,7 +31,7 @@ authProvider.api(
             res.json(headers);
         });
     }
-);
+});
 
 before(async function(){
     await authProvider.start();
@@ -71,27 +71,28 @@ describe('Startup', function(){
         assert.status.is(404);
     });
 
-    it('Should fail when cannot connect to redis', function(){
-        app.setup({ redis: { port: 8676 } });
-        assert.rejects(() => app.restart(), /Redis connection/);
+    it('Should fail when cannot connect to redis', async function(){
+        this.timeout(3e3);
+        await assert.rejects(app.restart({ redis: { port: 8676 } }));
+        app.setup({ redis: { port: 6379 } });
+        await app.start();
     });
-
 
     describe('Services', function(){
 
-        it('Should fail when endpoint has invalid method name', function(){
-            let obj = { services: { foo: { url: 'test', endpoints: [ 'FOO /bar' ] } } };
-            assert.throws( () => app.setup(obj), /method name/ );
+        it('Should fail when endpoint has invalid method name', async function(){
+            let p = app.restart({ services: { foo: { url: 'test', endpoints: [ 'FOO /bar' ] } } });
+            await assert.rejects(p, /method name/);
         });
 
-        it('Should fail if serivce has unsupported keys', function(){
-            let obj = { services: { foo: { bar: 'baz' } } };
-            assert.throws( () => app.setup(obj), /key 'bar'/ );
+        it('Should fail if serivce has unsupported keys', async function(){
+            let p = app.restart({ services: { foo: { bar: 'baz' } } });
+            await assert.rejects(p, /key 'bar'/ );
         });
 
-        it('Should fail if serivce has no endpoints', function(){
-            let obj = { services: { foo: { } } };
-            assert.throws( () => app.setup(obj), /least 1 endpoint/ );
+        it('Should fail if serivce has no endpoints', async function(){
+            let p = app.restart({ services: { foo: { } } });
+            await assert.rejects(p, /least 1 endpoint/ );
         });
 
     });
@@ -130,41 +131,6 @@ describe('API', function(){
             assert.body.contains('"cookie":"foo=bar');
         });
 
-        it('Should support WebSocket connection', function(done){
-            let count = 0;
-
-            const WebSocket = require('ws');
-            let wss = new WebSocket.Server({ port: 1234 });
-            wss.on('connection', client => {
-
-                client.on('message', message => {
-                    count++;
-                    assert.strictEqual(message, 'foobar');
-                    client.send('bahbaz');
-                });
-
-                client.on('close', () => {
-                    assert.strictEqual(count, 4);
-                    wss.close();
-                    done();
-                });
-
-                count++;
-            });
-
-            let wsc = new WebSocket('http://localhost:8232/ws/ws');
-            wsc.on('open', () => {
-                count++;
-                wsc.send('foobar');
-            });
-            wsc.on('message', m => {
-                count++;
-                assert.strictEqual(m, 'bahbaz');
-                wsc.close();
-            });
-
-        });
-
     });
 
     describe('POST /login', function(){
@@ -191,7 +157,7 @@ describe('API', function(){
     describe('POST /logout', function(){
 
         it('Should force expire an active session', async function(){
-            await app.restart({ session: { timeout: '1d' }, cookie: { secure: false } });
+            await app.restart({ session: { timeout: '1d' } });
             let { cookies } = await base.post('login');
             let { headers } = await base.post('logout', { cookies });
             assert(headers['set-cookie'][0].indexOf('01 Jan 1970') > 0);
@@ -210,14 +176,14 @@ describe('Settings', function(){
     });
 
     it('Should add setup header when proxying after auth [cookie.*][proxy.claimHeader]', async function(){
-        await app.restart({ proxy: { claimHeader: 'X-Foo' }, cookie: { secure: false } });
+        await app.restart({ proxy: { claimHeader: 'X-Foo' } });
         let { cookies } = await base.post('login');
         let { assert } = await base.get('backend/headers', { cookies });
         assert.body.contains('"x-foo":');
     });
 
     it('Should expire auth data after the setup timeout [session.timeout]', async function(){
-        await app.restart({ session: { timeout: '1s' }, cookie: { secure: false } });
+        await app.restart({ session: { timeout: '1s' } });
         let { cookies } = await base.post('login');
         await new Promise(done => setTimeout(done, 1500));
         let { body } = await base.get('backend/headers', { cookies });
