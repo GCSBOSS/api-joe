@@ -1,35 +1,60 @@
 const assert = require('assert');
+const { v4: uuid } = require('uuid');
 const { context } = require('muhb');
+const Nodecaf = require('nodecaf');
 
 process.env.NODE_ENV = 'testing';
 
 const init = require('../lib/main');
 
-const HTTPBIN_URL = process.env.HTTPBIN_URL || 'http://localhost:8066';
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const SERVICES = {
     ws: { url: 'ws://localhost:1234', endpoints: [ 'GET /ws' ] },
     unresponsive: { url: 'http://anything', endpoints: [ 'GET /foo' ] },
-    httpbin: { url: HTTPBIN_URL, endpoints: [ 'GET /get', 'GET /anything' ] }
+    backend: { url: 'http://localhost:8060', endpoints: [ 'GET /get', 'GET /headers' ] }
 };
 
 let base = context('http://localhost:8232');
 
 let app;
 
+const authProvider = new Nodecaf({
+    conf: { port: 8060, log: false },
+    api({ post, get }){
+        post('/auth', ({ res, body }) => {
+            if(body)
+                return res.status(400).end();
+            res.end('ID: ' + uuid());
+        });
+
+        get('/headers', ({ headers, res }) => {
+            res.json(headers);
+        });
+    }
+});
+
+before(async function(){
+    await authProvider.start();
+});
+
+after(async function(){
+    await authProvider.stop();
+});
+
 beforeEach(async function(){
     app = init();
     app.setup({
         port: 8232,
         redis: { host: REDIS_HOST },
-        cookie: { name: 'foobaz' },
+        cookie: { name: 'foobaz', secret: 'FOOBAR' },
         services: SERVICES,
-        auth: { url: HTTPBIN_URL + '/post' }
+        auth: { url: 'http://localhost:8060/auth' }
     });
     await app.start();
 });
 
 afterEach(async function(){
+    await new Promise(done => setTimeout(done, 400));
     await app.stop();
 });
 
@@ -46,27 +71,28 @@ describe('Startup', function(){
         assert.status.is(404);
     });
 
-    it('Should fail when cannot connect to redis', function(){
-        app.setup({ redis: { port: 8676 } });
-        assert.rejects(() => app.restart(), /Redis connection/);
+    it('Should fail when cannot connect to redis', async function(){
+        this.timeout(3e3);
+        await assert.rejects(app.restart({ redis: { port: 8676 } }));
+        app.setup({ redis: { port: 6379 } });
+        await app.start();
     });
-
 
     describe('Services', function(){
 
-        it('Should fail when endpoint has invalid method name', function(){
-            let obj = { services: { foo: { url: 'test', endpoints: [ 'FOO /bar' ] } } };
-            assert.throws( () => app.setup(obj), /method name/ );
+        it('Should fail when endpoint has invalid method name', async function(){
+            let p = app.restart({ services: { foo: { url: 'test', endpoints: [ 'FOO /bar' ] } } });
+            await assert.rejects(p, /method name/);
         });
 
-        it('Should fail if serivce has unsupported keys', function(){
-            let obj = { services: { foo: { bar: 'baz' } } };
-            assert.throws( () => app.setup(obj), /key 'bar'/ );
+        it('Should fail if serivce has unsupported keys', async function(){
+            let p = app.restart({ services: { foo: { bar: 'baz' } } });
+            await assert.rejects(p, /key 'bar'/ );
         });
 
-        it('Should fail if serivce has no endpoints', function(){
-            let obj = { services: { foo: { } } };
-            assert.throws( () => app.setup(obj), /least 1 endpoint/ );
+        it('Should fail if serivce has no endpoints', async function(){
+            let p = app.restart({ services: { foo: { } } });
+            await assert.rejects(p, /least 1 endpoint/ );
         });
 
     });
@@ -94,50 +120,15 @@ describe('API', function(){
         });
 
         it('Should reach an exposed service endpoints', async function(){
-            let { assert } = await base.get('httpbin/get');
+            let { assert } = await base.get('backend/headers');
             assert.status.is(200);
-            assert.body.contains('/get');
+            assert.body.contains('date');
         });
 
         it('Should preserve cookies from outside when setup [proxy.preserveCookies]', async function(){
             await app.restart({ proxy: { preserveCookies: true } });
-            let { assert } = await base.get('httpbin/get', { 'cookies': { foo: 'bar' } });
-            assert.body.contains('"Cookie": "foo=bar');
-        });
-
-        it('Should support WebSocket connection', function(done){
-            let count = 0;
-
-            const WebSocket = require('ws');
-            let wss = new WebSocket.Server({ port: 1234 });
-            wss.on('connection', client => {
-
-                client.on('message', message => {
-                    count++;
-                    assert.strictEqual(message, 'foobar');
-                    client.send('bahbaz');
-                });
-
-                client.on('close', () => {
-                    assert.strictEqual(count, 4);
-                    wss.close();
-                    done();
-                });
-
-                count++;
-            });
-
-            let wsc = new WebSocket('http://localhost:8232/ws/ws');
-            wsc.on('open', () => {
-                count++;
-                wsc.send('foobar');
-            });
-            wsc.on('message', m => {
-                count++;
-                assert.strictEqual(m, 'bahbaz');
-                wsc.close();
-            });
-
+            let { assert } = await base.get('backend/headers', { 'cookies': { foo: 'bar' } });
+            assert.body.contains('"cookie":"foo=bar');
         });
 
     });
@@ -152,13 +143,12 @@ describe('API', function(){
         });
 
         it('Should return authentication failure when not 200', async function(){
-            await app.restart({ auth: { url: HTTPBIN_URL + '/get' } });
-            let { assert } = await base.post('login');
+            let { assert } = await base.post('login', 'must fail');
             assert.status.is(400);
         });
 
         it('Should return ok when auth succeeds', async function(){
-            let { assert } = await base.post('login', 'some raw data');
+            let { assert } = await base.post('login');
             assert.status.is(200);
         });
 
@@ -167,10 +157,153 @@ describe('API', function(){
     describe('POST /logout', function(){
 
         it('Should force expire an active session', async function(){
-            await app.restart({ session: { timeout: '1d' }, cookie: { secure: false } });
-            let { cookies } = await base.post('login', 'some raw data');
+            await app.restart({ session: { timeout: '1d' } });
+            let { cookies } = await base.post('login');
             let { headers } = await base.post('logout', { cookies });
             assert(headers['set-cookie'][0].indexOf('01 Jan 1970') > 0);
+        });
+
+    });
+
+    describe('WS /events', function(){
+        const WebSocket = require('ws');
+        const redis = require('async-redis');
+
+        let backend, logWS, pubWS, logWS2, logClaim;
+
+        before(async function(){
+            backend = redis.createClient({ host: REDIS_HOST });
+            await new Promise( (done, fail) => {
+                backend.on('connect', done);
+                backend.on('error', fail);
+                backend.on('end', fail);
+            });
+        });
+
+        beforeEach(async function(){
+            let { cookies } = await base.post('login');
+            let { cookies: c2 } = await base.post('login');
+            logClaim = await backend.get(cookies.foobaz.substr(2, 36));
+            await backend.sadd(logClaim, logClaim);
+            pubWS = new WebSocket('ws://localhost:8232/events');
+            logWS = new WebSocket('ws://localhost:8232/events', {
+                headers: { 'Cookie': 'foobaz=' + cookies.foobaz }
+            });
+            logWS2 = new WebSocket('ws://localhost:8232/events', {
+                headers: { 'Cookie': 'foobaz=' + c2.foobaz }
+            });
+        });
+
+        afterEach(function(){
+            pubWS.close();
+            logWS.close();
+            logWS2.close();
+        });
+
+        after(function(){
+            backend.quit();
+        });
+
+        it('Should accept Authenticated WS clients', async function(){
+            await new Promise(done => logWS.on('open', async () => {
+                await new Promise(done => setTimeout(done, 400));
+                app.websockets.forEach(ws => assert(ws.claim || ws.public));
+                done();
+            }));
+        });
+
+        it('Should notify all clients', function(done){
+            let c = 0, r = 0;
+            let cfn = () => {
+                c == 1 &&
+                    backend.publish('joe:ws:event', '{"broadcast":true,"data":"foobar"}');
+                c++;
+            };
+            let rfn = msg => {
+                assert.strictEqual(msg, '"foobar"');
+                r == 1 && done();
+                r++;
+            }
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            pubWS.on('message', rfn);
+            logWS.on('message', rfn);
+        });
+
+        it('Should notify only public clients', function(done){
+            let c = 0;
+            let cfn = () => {
+                c == 1 &&
+                    backend.publish('joe:ws:event', '{"public":true,"data":"foobar"}');
+                c++;
+            };
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            pubWS.on('message', () => done());
+            logWS.on('message', () => done(new Error('Logged client received public message')));
+        });
+
+        it('Should notify only targeted clients', function(done){
+            let c = 0;
+            let cfn = () => {
+                c == 2 &&
+                    backend.publish('joe:ws:event', '{"target":"' + logClaim + '","data":"foobar"}');
+                c++;
+            };
+
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            logWS2.on('open', cfn);
+            logWS.on('message', () => setTimeout(done, 400));
+            pubWS.on('message', () => done(new Error('Logged client received public message')));
+            logWS2.on('message', () => done(new Error('Logged client received public message')));
+        });
+
+        it('Should notify only targeted group', function(done){
+            let c = 0;
+            let cfn = () => {
+                c == 2 &&
+                    backend.publish('joe:ws:event', '{"members":"' + logClaim + '","data":"foobar"}');
+                c++;
+            };
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            logWS2.on('open', cfn);
+            logWS.on('message', () => done());
+            pubWS.on('message', () => done(new Error('Logged client received public message')));
+            logWS2.on('message', () => done(new Error('Logged client received public message')));
+        });
+
+        it('Should notify only targeted group with exception', function(done){
+            let c = 0;
+            let cfn = () => {
+                c == 2 &&
+                    backend.publish('joe:ws:event', `{"except":["${logClaim}"], "members":"${logClaim}","data":"foobar"}`);
+                c++;
+            };
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            logWS2.on('open', cfn);
+            logWS.on('message', () => done(new Error('Logged client received public message')));
+            pubWS.on('message', () => done(new Error('Logged client received public message')));
+            logWS2.on('message', () => done(new Error('Logged client received public message')));
+            setTimeout(done, 400);
+        });
+
+        it('Should notify only targeted clients except within group', function(done){
+            let c = 0;
+            let cfn = () => {
+                c == 2 &&
+                    backend.publish('joe:ws:event', `{"target":["${logClaim}"], "notMembers":"${logClaim}","data":"foobar"}`);
+                c++;
+            };
+            pubWS.on('open', cfn);
+            logWS.on('open', cfn);
+            logWS2.on('open', cfn);
+            logWS.on('message', () => done(new Error('Logged client received public message')));
+            pubWS.on('message', () => done(new Error('Logged client received public message')));
+            logWS2.on('message', () => done(new Error('Logged client received public message')));
+            setTimeout(done, 400);
         });
 
     });
@@ -186,18 +319,18 @@ describe('Settings', function(){
     });
 
     it('Should add setup header when proxying after auth [cookie.*][proxy.claimHeader]', async function(){
-        await app.restart({ proxy: { claimHeader: 'X-Foo' }, cookie: { secure: false } });
+        await app.restart({ proxy: { claimHeader: 'X-Foo' } });
         let { cookies } = await base.post('login');
-        let { assert } = await base.get('httpbin/anything', { cookies });
-        assert.body.contains('"X-Foo":');
+        let { assert } = await base.get('backend/headers', { cookies });
+        assert.body.contains('"x-foo":');
     });
 
     it('Should expire auth data after the setup timeout [session.timeout]', async function(){
-        await app.restart({ session: { timeout: '1s' }, cookie: { secure: false } });
-        let { cookies } = await base.post('login', 'some raw data');
+        await app.restart({ session: { timeout: '1s' } });
+        let { cookies } = await base.post('login');
         await new Promise(done => setTimeout(done, 1500));
-        let { body } = await base.get('httpbin/anything', { cookies });
-        assert(body.indexOf('X-Claim') < 0);
+        let { body } = await base.get('backend/headers', { cookies });
+        assert(body.indexOf('x-claim') < 0);
     });
 
     it('Should POST to specified URL when auth succeeds [auth.onSuccess]', function(done){

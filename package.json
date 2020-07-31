@@ -35,14 +35,14 @@
   ],
   "dependencies": {
     "async-redis": "^1.1.7",
-    "http-proxy": "^1.18.0",
-    "muhb": "^3.0.1",
-    "nodecaf": "^0.9.1",
-    "nodecaf-run": "0.0.2",
+    "http-proxy": "^1.18.1",
+    "muhb": "^3.0.3",
+    "nodecaf": "^0.10.0-rc4",
+    "nodecaf-run": "0.0.4",
     "periodo": "^0.1.1",
-    "uuid": "^7.0.2"
+    "uuid": "^8.2.0"
   },
   "devDependencies": {
-    "ws": "^7.2.3"
+    "ws": "^7.3.1"
   }
 }

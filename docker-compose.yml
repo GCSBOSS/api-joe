@@ -17,10 +17,5 @@ services:
     ports:
       - 6379:6379
 
-  httpbin:
-    image: kennethreitz/httpbin
-    ports:
-      - 8066:80
-
   auth:
     image: gcsboss/okaeri

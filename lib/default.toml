@@ -1,21 +1,18 @@
 cors = true
 port = 9000
 servicesFile = ''
-signatureSecret = 'foobar'
 
 [proxy]
 claimHeader = 'X-Claim'
 preserveCookies = false
 
-[cookie]
-name = 'claim'
-maxAge = '1w'
-secure = true
-httpOnly = true
-sameSite = true
-
 [session]
 timeout = '1w'
+
+[cookie]
+secret = 'foobar'
+name = 'claim'
+sameSite = false
 
 [redis]
 host = "localhost"
