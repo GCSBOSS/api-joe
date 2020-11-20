@@ -1,7 +1,13 @@
 version: '3.7'
 
 services:
-
+  pebble:
+    image: letsencrypt/pebble
+    ports:
+      - 14000:14000
+    environment:
+      PEBBLE_VA_SLEEPTIME: 4
+    
   session:
     image: redis
     ports:

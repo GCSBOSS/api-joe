@@ -7,16 +7,20 @@ process.env.NODE_ENV = 'testing';
 
 const init = require('../lib/main');
 
+const ACME_GATEWAY = process.env.ACME_GATEWAY || 'host.docker.internal';
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
+const ACME_API_URL = process.env.ACME_API_URL || 'https://localhost:14000/dir';
 const SERVICES = {
     ws: { url: 'ws://localhost:1234', endpoints: [ 'GET /ws' ] },
     unresponsive: { url: 'http://anything', endpoints: [ 'GET /foo' ] },
     backend: { url: 'http://localhost:8060', endpoints: [ 'GET /get', 'GET /headers' ] },
     public: { url: 'http://localhost:8060', exposed: true },
-    hostly: { domain: 'foobar', url: 'http://localhost:8060', exposed: true }
+    hostly: { domain: 'foobar', url: 'http://localhost:8060', exposed: true },
+    httpsonly: { domain: ACME_GATEWAY, url: 'http://localhost:8060', secure: true, endpoints: [ 'GET /headers' ] }
 };
+const ACME_CONF = { api: ACME_API_URL, email: 'api-joe@gmail.com' };
 
-let app, base = context('http://localhost:8236');
+let app, base = context('http://127.0.0.1:8236'), secBase = context('https://localhost:8236');
 
 const authProvider = new Nodecaf({
     conf: { port: 8060, log: false },
@@ -331,6 +335,66 @@ describe('Events', function(){
         pubWS.on('message', () => done(new Error('Logged client received public message')));
         logWS2.on('message', () => done(new Error('Logged client received public message')));
         setTimeout(done, 400);
+    });
+
+});
+
+describe('ACME', function(){
+    const redis = require('async-redis');
+    let redisClient;
+    process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
+
+    before(async function(){
+        redisClient = redis.createClient({ host: REDIS_HOST });
+        await new Promise( (done, fail) => {
+            redisClient.on('connect', done);
+            redisClient.on('error', fail);
+            redisClient.on('end', fail);
+        });
+    });
+
+    after(function(){
+        redisClient.quit();
+    });
+
+    it('Should handle SSL when ACME is setup', async function(){
+        this.timeout(6e3);
+
+        await redisClient.del('joe:privateKey');
+        await redisClient.del('joe:domains:' + ACME_GATEWAY);
+
+        await app.restart({ acme: ACME_CONF });
+
+        let { assert } = await secBase.get('headers', { 'host': ACME_GATEWAY });
+        assert.status.is(200);
+        // TODO actually validate if cert is OK?
+    });
+
+    it('Should reuse SSl cert while still valid', async function(){
+        this.timeout(6e3);
+
+        await redisClient.del('joe:domains:' + ACME_GATEWAY);
+
+        await app.restart({ acme: ACME_CONF });
+
+        await secBase.get('headers', { 'host': ACME_GATEWAY });
+        let { assert } = await secBase.get('headers', { 'host': ACME_GATEWAY });
+        assert.status.is(200);
+        // TODO actually validate if cert is OK?
+    });
+
+    it('Should default to Self Signed cert in case of ACME error', async function(){
+        this.timeout(6e3);
+
+        await redisClient.del('joe:privateKey');
+        await redisClient.del('joe:domains:' + ACME_GATEWAY);
+
+        await app.restart({ acme: ACME_CONF });
+
+        // Passing HOST that is unreachable to Pebble
+        let { assert } = await secBase.get('headers', { 'host': 'httpsonly' });
+        assert.status.is(200);
+        // TODO actually validate if cert is OK?
     });
 
 });
