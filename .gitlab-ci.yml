@@ -2,6 +2,9 @@ stages:
   - test
   - deploy
 
+variables:
+  FF_NETWORK_PER_BUILD: 1
+
 include:
   - template: Dependency-Scanning.gitlab-ci.yml
   - template: SAST.gitlab-ci.yml
@@ -30,8 +33,11 @@ lint-js:
 unit-test:
   variables:
     REDIS_HOST: redis
+    ACME_GATEWAY: build
+    ACME_API_URL: https://letsencrypt-pebble:14000/dir
   services:
     - redis
+    - letsencrypt/pebble
   coverage: '/Statements\s*:\s*(\d+(?:\.\d+)?\%)/'
   image: registry.gitlab.com/gcsboss/docker-mocha-nyc:0.1.0-alpine
   stage: test
