@@ -2,20 +2,7 @@ version: '3.7'
 
 services:
 
-  #joe:
-  #  build: .
-  #  volumes:
-  #    - ./test.toml:/usr/src/app/conf.toml
-
-  db:
-    image: mongo
-    ports:
-      - 27017:27017
-
   session:
     image: redis
     ports:
       - 6379:6379
-
-  auth:
-    image: gcsboss/okaeri

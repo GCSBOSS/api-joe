@@ -1,6 +1,5 @@
 cors = true
 port = 9000
-servicesFile = ''
 
 [proxy]
 claimHeader = 'X-Claim'
@@ -23,3 +22,13 @@ method = 'POST'
 url = "http://localhost"
 timeout = 3000
 onSuccess = false
+
+# [acme.provider]
+#
+# [services.abc]
+# url = 'http://backend-proxy:8080'
+# domain = 'gcsboss.com'
+# endpoints = [
+#     'POST /speech',
+#     'POST /whisper'
+# ]
