@@ -12,8 +12,8 @@ const SERVICES = {
     ws: { url: 'ws://localhost:1234', endpoints: [ 'GET /ws' ] },
     unresponsive: { url: 'http://anything', endpoints: [ 'GET /foo' ] },
     backend: { url: 'http://localhost:8060', endpoints: [ 'GET /get', 'GET /headers' ] },
-    public: { url: 'http://localhost:8060' },
-    hostly: { domain: 'foobar', url: 'http://localhost:8060', endpoints: [ 'GET /headers' ] }
+    public: { url: 'http://localhost:8060', exposed: true },
+    hostly: { domain: 'foobar', url: 'http://localhost:8060', exposed: true }
 };
 
 let app, base = context('http://localhost:8236');
@@ -108,6 +108,14 @@ describe('Proxy', function(){
         let { assert } = await base.get('backend/headers');
         assert.status.is(200);
         assert.body.contains('date');
+    });
+
+    it('Should reach any endpoint of exposed service [*service.exposed]', async function(){
+        let { assert } = await base.get('public/public-only');
+        assert.status.is(200);
+        assert.body.contains('public-only');
+        let { assert: a } = await base.get('public/nothing');
+        a.status.is(404);
     });
 
     it('Should preserve cookies from outside when setup [proxy.preserveCookies]', async function(){
