@@ -243,7 +243,7 @@ describe('Events', function(){
         });
     });
 
-    it('Should notify all clients', function(done){
+    it('Should broadcast to logged in clients', function(done){
         let c = 0, r = 0;
         let cfn = () => {
             c == 1 &&
@@ -255,9 +255,9 @@ describe('Events', function(){
             r == 1 && done();
             r++;
         }
-        pubWS.on('open', cfn);
+        logWS2.on('open', cfn);
         logWS.on('open', cfn);
-        pubWS.on('message', rfn);
+        logWS2.on('message', rfn);
         logWS.on('message', rfn);
     });
 
