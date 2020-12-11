@@ -11,9 +11,8 @@ const ACME_GATEWAY = process.env.ACME_GATEWAY || 'host.docker.internal';
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const ACME_API_URL = process.env.ACME_API_URL || 'https://localhost:14000/dir';
 const SERVICES = {
-    ws: { url: 'ws://localhost:1234', endpoints: [ 'GET /ws' ] },
     unresponsive: { url: 'http://anything', endpoints: [ 'GET /foo' ] },
-    backend: { url: 'http://localhost:8060', endpoints: [ 'GET /get', 'GET /headers' ] },
+    backend: { url: 'http://localhost:8060', endpoints: [ 'GET /say/:something', 'GET /headers' ] },
     public: { url: 'http://localhost:8060', exposed: true },
     hostly: { domain: 'foobar', url: 'http://localhost:8060', exposed: true },
     httpsonly: { domain: ACME_GATEWAY, url: 'http://localhost:8060', secure: true, endpoints: [ 'GET /headers' ] }
@@ -30,6 +29,8 @@ const authProvider = new Nodecaf({
                 return res.status(400).end();
             res.end('ID: ' + uuid());
         });
+
+        get('/say/:something', ({ params, res }) => res.text(params.something));
 
         get('/headers', ({ headers, res }) => res.json(headers));
 
@@ -98,7 +99,7 @@ describe('Proxy', function(){
     });
 
     it('Should fail when service is unresponsive', async function(){
-        this.timeout(2700);
+        this.timeout(4000);
         let { assert } = await base.get('unresponsive/foo');
         assert.status.is(503);
     });
@@ -112,6 +113,9 @@ describe('Proxy', function(){
         let { assert } = await base.get('backend/headers');
         assert.status.is(200);
         assert.body.contains('date');
+        let { assert: a2 } = await base.get('backend/say/foobar');
+        a2.status.is(200);
+        a2.body.exactly('foobar');
     });
 
     it('Should reach any endpoint of exposed service [*service.exposed]', async function(){
