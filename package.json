@@ -1,6 +1,6 @@
 {
   "name": "api-joe",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "An API Gateway to easily expose your services to web clients",
   "main": "lib/main.js",
   "author": "Guilherme C. Souza",
