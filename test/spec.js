@@ -24,6 +24,9 @@ let app, base = context('http://127.0.0.1:8236'), secBase = context('https://loc
 const authProvider = new Nodecaf({
     conf: { port: 8060, log: false },
     api({ post, get }){
+
+        get('/', ({ res }) => res.end())
+
         post('/auth', ({ res, body }) => {
             if(body)
                 return res.status(400).end();
@@ -438,6 +441,15 @@ describe('Settings', function(){
             await app.restart({ auth: { onSuccess: 'http://localhost:2345' } });
             await base.post('login');
         })();
+    });
+
+});
+
+describe('Regression', function(){
+
+    it('Should respond to path /', async function(){
+        let { assert } = await base.get('', { 'host': 'hostly' });
+        assert.status.is(200);
     });
 
 });

@@ -40,7 +40,7 @@
     "cookie-signature": "^1.1.0",
     "http-proxy": "^1.18.1",
     "muhb": "^3.0.4",
-    "nodecaf": "^0.11.1",
+    "nodecaf": "^0.11.2",
     "nodecaf-run": "^0.1.1",
     "path-to-regexp": "^6.2.0",
     "periodo": "^0.1.1",
