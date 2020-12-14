@@ -452,4 +452,13 @@ describe('Regression', function(){
         assert.status.is(200);
     });
 
+    it('Should be ok being logged in successively (nodecaf fixed bug)', async function(){
+        let { cookies } = await base.post('login');
+        await base.post('logout', { cookies });
+        let { cookies: cs } = await base.post('login');
+        await base.post('logout', { cookies: cs });
+        let { headers } = await base.post('login');
+        assert(headers['set-cookie'][0].indexOf('Max-Age=0') < 0);
+    });
+
 });
