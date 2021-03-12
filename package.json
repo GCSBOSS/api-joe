@@ -35,12 +35,12 @@
   ],
   "dependencies": {
     "acme-client": "^4.1.3",
-    "async-redis": "^1.1.7",
     "cookie": "^0.4.1",
     "cookie-signature": "^1.1.0",
     "http-proxy": "^1.18.1",
     "muhb": "^3.0.4",
     "nodecaf": "^0.11.4",
+    "nodecaf-redis": "0.0.1",
     "nodecaf-run": "^0.1.2",
     "path-to-regexp": "^6.2.0",
     "periodo": "^0.1.1",
